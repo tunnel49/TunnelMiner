@@ -22,8 +22,10 @@
     2. docknings ai
     3. thrusters i alla kardinalriktningar
     4. gyro
+    5. remote control
 
 ## Test
 
 1.) Programmet tar en input:
     om inputen är debug skriv ut ett meddelande i programmets output
+2.) Programmet har ett remote block, om det inte finns, skriv ut det vid debug

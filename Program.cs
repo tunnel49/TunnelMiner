@@ -22,15 +22,8 @@ namespace IngameScript
 {
     public partial class Program : MyGridProgram
     {
-        // This file contains your actual script.
-        //
-        // You can either keep all your code here, or you can create separate
-        // code files to make your program easier to navigate while coding.
-        //
-        // Go to:
-        // https://github.com/malware-dev/MDK-SE/wiki/Quick-Introduction-to-Space-Engineers-Ingame-Scripts
-        //
-        // to learn more about ingame scripts.
+        private IMyRemoteControl myRemoteControl;
+
 
         public Program()
         {
@@ -44,6 +37,7 @@ namespace IngameScript
             // It's recommended to set Runtime.UpdateFrequency 
             // here, which will allow your script to run itself without a 
             // timer block.
+
         }
 
         public void Save()
@@ -62,6 +56,9 @@ namespace IngameScript
             {
                 case "debug":
                     Echo("Hello World");
+                    if (myRemoteControl == null) {
+                        Echo("No remote control found");
+                    }
                     break;
             } 
             // The main entry point of the script, invoked every time
