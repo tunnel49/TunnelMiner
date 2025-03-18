@@ -61,7 +61,7 @@ namespace IngameScript
             switch (argument)
             {
                 case "debug":
-                    Echo("Hello World")
+                    Echo("Hello World");
                     break;
             } 
             // The main entry point of the script, invoked every time
