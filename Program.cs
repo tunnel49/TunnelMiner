@@ -63,6 +63,9 @@ namespace IngameScript
                         Quaternion myQuaternion;
                         myRemoteControl.Orientation.GetQuaternion(out myQuaternion);
                         Echo("  " + myQuaternion );
+
+                        Quaternion myWorldQuaternion = Quaternion.CreateFromRotationMatrix(myRemoteControl.WorldMatrix);
+                        Echo("  " + myWorldQuaternion);
                     }
                     break;
             } 

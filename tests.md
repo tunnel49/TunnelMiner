@@ -32,3 +32,4 @@
 3.) Det finns en sträng med remoteblockets namn, vid programstart läser programmet in objektet med det namnet. Om det finns, skriv ut att det gör det.
 4.) Skriv ut remote control blockets namn när det hittats
 5.) Skriv ut remote control blockets lokala quarternion(?)
+6.) Skriver ut den globala quaternionen för remot control blocket
