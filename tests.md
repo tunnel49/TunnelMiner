@@ -33,3 +33,31 @@
 4.) Skriv ut remote control blockets namn när det hittats
 5.) Skriv ut remote control blockets lokala quarternion(?)
 6.) Skriver ut den globala quaternionen för remot control blocket
+
+
+Skapa periodiska körningar
+Skapa en funktion som tar pitch, yaw och roll och sätter override på gyron.
+
+### Stolen code
+
+void ApplyGyroOverride(double pitch_speed, double yaw_speed, double roll_speed, List<IMyGyro> gyro_list, IMyTerminalBlock reference)
+{
+    var rotationVec = new Vector3D(-pitch_speed, yaw_speed, roll_speed); //because keen does some weird stuff with signs 
+    var shipMatrix = reference.WorldMatrix;
+    var relativeRotationVec = Vector3D.TransformNormal(rotationVec, shipMatrix);
+
+    foreach (var thisGyro in gyro_list)
+    {
+        var gyroMatrix = thisGyro.WorldMatrix;
+        var transformedRotationVec = Vector3D.TransformNormal(relativeRotationVec, Matrix.Transpose(gyroMatrix));
+
+        thisGyro.Pitch = (float)transformedRotationVec.X;
+        thisGyro.Yaw = (float)transformedRotationVec.Y;
+        thisGyro.Roll = (float)transformedRotationVec.Z;
+        thisGyro.GyroOverride = true;
+    }
+}
+
+7.) 
+
+8.) Ny funktion test1. som roterar lite åt något håll
