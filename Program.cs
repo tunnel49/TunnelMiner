@@ -58,6 +58,12 @@ namespace IngameScript
 
         public void Main(string argument, UpdateType updateSource)
         {
+            switch (argument)
+            {
+                case "debug":
+                    Echo("Hello World")
+                    break;
+            } 
             // The main entry point of the script, invoked every time
             // one of the programmable block's Run actions are invoked,
             // or the script updates itself. The updateSource argument
