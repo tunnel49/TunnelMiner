@@ -1,4 +1,5 @@
 ﻿using Sandbox.Game.EntityComponents;
+using Sandbox.Graphics.GUI;
 using Sandbox.ModAPI.Ingame;
 using Sandbox.ModAPI.Interfaces;
 using SpaceEngineers.Game.ModAPI.Ingame;
@@ -6,6 +7,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Drawing.Text;
 using System.Linq;
 using System.Text;
 using VRage;
@@ -18,22 +20,18 @@ using VRage.Game.ModAPI.Ingame.Utilities;
 using VRage.Game.ObjectBuilders.Definitions;
 using VRageMath;
 
+
 namespace IngameScript
 {
     public partial class Program : MyGridProgram
     {
-        private IMyRemoteControl myRemoteControl;
-
+        private readonly IMyRemoteControl myRemoteControl;
+        private readonly String myRemoteControlName = "myRemoteControl";
 
         public Program()
         {
-            // The constructor, called only once every session and
-            // always before any other method is called. Use it to
-            // initialize your script. 
-            //     
-            // The constructor is optional and can be removed if not
-            // needed.
-            // 
+            myRemoteControl = GridTerminalSystem.GetBlockWithName(myRemoteControlName) as IMyRemoteControl;
+  
             // It's recommended to set Runtime.UpdateFrequency 
             // here, which will allow your script to run itself without a 
             // timer block.
@@ -58,18 +56,17 @@ namespace IngameScript
                     Echo("Hello World");
                     if (myRemoteControl == null) {
                         Echo("No remote control found");
+                    } else {
+                        Echo("Remote control found:");
+                        Echo("  " + myRemoteControl.CustomName);
+                        Echo("My Local Quaternion:");
+                        Quaternion myQuaternion;
+                        myRemoteControl.Orientation.GetQuaternion(out myQuaternion);
+                        Echo("  " + myQuaternion );
                     }
                     break;
             } 
-            // The main entry point of the script, invoked every time
-            // one of the programmable block's Run actions are invoked,
-            // or the script updates itself. The updateSource argument
-            // describes where the update came from. Be aware that the
-            // updateSource is a  bitfield  and might contain more than 
-            // one update type.
-            // 
-            // The method itself is required, but the arguments above
-            // can be removed if not needed.
+    
         }
     }
 }
