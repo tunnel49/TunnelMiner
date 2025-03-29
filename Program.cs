@@ -29,21 +29,25 @@ namespace IngameScript
     {
         public class Ship
         {
-            private float rotationfactor; 
+            private readonly String myRemoteControlName = "myRemoteControl";
+            private readonly String myGyroName = "myGyro";
+
+
+            public float RotationFactor { get; set; }
             public IMyRemoteControl MyRemoteControl { get; }
             private readonly IMyGyro MyGyro;
             private readonly MyGridProgram MyGrid;
-            private readonly String myRemoteControlName = "myRemoteControl";
-            private readonly String myGyroName = "myGyro";
+
+            private Quaternion _targetQuaternion;
+            public Quaternion TargetQuaternion
+            {
+                get { return _targetQuaternion; }
+                set
+                {
+                    _targetQuaternion = value;
+                }
+            }
             private bool _control;
-            public Quaternion MyQuaternion
-            {
-                get { return Quaternion.CreateFromRotationMatrix(MyGyro.WorldMatrix); } 
-            }
-            public Quaternion MyConjugate
-            {
-                get { return Quaternion.Conjugate(MyQuaternion); } 
-            }
             public bool Control
             {
                 get { return _control; }
@@ -53,20 +57,14 @@ namespace IngameScript
                     ControlEnabled(value);
                 }
             }
-            public Vector3 AngularMovement //Radians per second
-            {
-                set
-                {
-                    UpdateGyro(value);
-                }
-            }
-            
             public Ship(MyGridProgram grid)
             {
                 MyGrid = grid;
-                rotationfactor = 1f;
-                MyRemoteControl = grid.GridTerminalSystem.GetBlockWithName(myRemoteControlName) as IMyRemoteControl;
-                MyGyro = grid.GridTerminalSystem.GetBlockWithName(myGyroName) as IMyGyro;
+                RotationFactor = 1f;
+                MyRemoteControl = MyGrid.GridTerminalSystem.GetBlockWithName(myRemoteControlName) as IMyRemoteControl;
+                MyGyro = MyGrid.GridTerminalSystem.GetBlockWithName(myGyroName) as IMyGyro;
+                MyGrid.Echo("Ship initialized");
+                TargetQuaternion = Quaternion.Zero;
             }
             private void ControlEnabled(Boolean control)
             {
@@ -74,29 +72,45 @@ namespace IngameScript
             }
             private void UpdateGyro(Vector3 angularMovement)
             {
+                // Set in Radians per second, visualized in the control panel as RPM
                 // yaw is y
                 // pitch is x
                 // roll is z
-                // Set in Radians per second, visualized in the control panel as RPM
-                MyGyro.Pitch = angularMovement.X * -rotationfactor;
-                MyGyro.Yaw = angularMovement.Y * -rotationfactor;
-                MyGyro.Roll = angularMovement.Z * -rotationfactor;
+                MyGyro.Pitch = angularMovement.X * -1f;
+                MyGyro.Yaw = angularMovement.Y * -1f;
+                MyGyro.Roll = angularMovement.Z * -1f;
+            }
+            public void RunTick10()
+            {
+                if (! Quaternion.IsZero(TargetQuaternion)) {
+                    TurnToCurrentTarget();
+                }
+            }
+            private void TurnToCurrentTarget()
+            {
+                var MyQuaternion = Quaternion.CreateFromRotationMatrix(MyGyro.WorldMatrix);
+                var MyConjugate = Quaternion.Conjugate(MyQuaternion); 
+                var MyWorldRotation = TargetQuaternion * MyConjugate;
+                var MyLocalRotation = MyQuaternion * MyWorldRotation * MyConjugate;
+
+                if (MyLocalRotation.W < 0f) {
+                    MyLocalRotation = Quaternion.Negate(MyLocalRotation);
+                }
+                float angle;
+                Vector3 axis;
+                MyLocalRotation.GetAxisAngle(out axis, out angle);
+                UpdateGyro(axis * angle * RotationFactor);
             }
         }
 
         private readonly Ship MyShip;
-        private readonly Quaternion MyTargetQuaternion;
         public Program()
         {
-            MyShip = new Ship(this); 
-            MyTargetQuaternion = new Quaternion(1f, 0f, 0f, 0f);
-  
-            // It's recommended to set Runtime.UpdateFrequency 
-            // here, which will allow your script to run itself without a 
-            // timer block.
-
+            MyShip = new Ship(this)
+            {
+                TargetQuaternion = new Quaternion(1f, 0f, 0f, 0f)
+            };
         }
-
 
         public void Save()
         {
@@ -110,26 +124,10 @@ namespace IngameScript
 
         private void RunTick10()
         {
-            // MyShip.AngularMovement = new Quaternion(0f, 0f, 1f, 0f);
             // This method will be called every 10th tick (6 times a second).
             // This is a good place to put code that needs to run frequently
             // but doesn't need to run every tick.
-
-            // var MyDelta = Quaternion.Concatenate(MyShip.MyConjugate, MyTargetQuaternion);
-            var MyWorldRotation = MyTargetQuaternion * MyShip.MyConjugate;
-            var MyLocalRotation = MyShip.MyQuaternion * MyWorldRotation * MyShip.MyConjugate;
-
-            if (MyLocalRotation.W < 0f) {
-                MyLocalRotation = Quaternion.Negate(MyLocalRotation);
-            }
-                // yaw is y
-                // pitch is x
-                // roll is z
-
-            float angle;
-            Vector3 axis;
-            MyLocalRotation.GetAxisAngle(out axis, out angle);
-            MyShip.AngularMovement = angle * axis;
+            MyShip.RunTick10();
         }
 
         public void Main(string argument, UpdateType updateSource)
@@ -171,6 +169,7 @@ namespace IngameScript
                     Echo("Running");
                     Runtime.UpdateFrequency = UpdateFrequency.Update10;
                     MyShip.Control = true;
+
                     break;
                 case "stop":
                     Echo("Stopping");
