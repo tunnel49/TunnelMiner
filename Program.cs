@@ -29,6 +29,7 @@ namespace IngameScript
     {
         public class Ship
         {
+            private float rotationfactor; 
             public IMyRemoteControl MyRemoteControl { get; }
             private readonly IMyGyro MyGyro;
             private readonly MyGridProgram MyGrid;
@@ -63,6 +64,7 @@ namespace IngameScript
             public Ship(MyGridProgram grid)
             {
                 MyGrid = grid;
+                rotationfactor = 1f;
                 MyRemoteControl = grid.GridTerminalSystem.GetBlockWithName(myRemoteControlName) as IMyRemoteControl;
                 MyGyro = grid.GridTerminalSystem.GetBlockWithName(myGyroName) as IMyGyro;
             }
@@ -72,10 +74,13 @@ namespace IngameScript
             }
             private void UpdateGyro(Vector3 angularMovement)
             {
+                // yaw is y
+                // pitch is x
+                // roll is z
                 // Set in Radians per second, visualized in the control panel as RPM
-                MyGyro.Pitch = angularMovement.X;
-                MyGyro.Yaw = angularMovement.Y;
-                MyGyro.Roll = angularMovement.Z;
+                MyGyro.Pitch = angularMovement.X * -rotationfactor;
+                MyGyro.Yaw = angularMovement.Y * -rotationfactor;
+                MyGyro.Roll = angularMovement.Z * -rotationfactor;
             }
         }
 
@@ -84,7 +89,7 @@ namespace IngameScript
         public Program()
         {
             MyShip = new Ship(this); 
-            MyTargetQuaternion = new Quaternion(0f, 0f, 0f, 1f);
+            MyTargetQuaternion = new Quaternion(1f, 0f, 0f, 0f);
   
             // It's recommended to set Runtime.UpdateFrequency 
             // here, which will allow your script to run itself without a 
@@ -109,10 +114,21 @@ namespace IngameScript
             // This method will be called every 10th tick (6 times a second).
             // This is a good place to put code that needs to run frequently
             // but doesn't need to run every tick.
-            var MyDelta = MyTargetQuaternion * MyShip.MyConjugate ;
-            Vector3 axis;
+
+            // var MyDelta = Quaternion.Concatenate(MyShip.MyConjugate, MyTargetQuaternion);
+            var MyWorldRotation = MyTargetQuaternion * MyShip.MyConjugate;
+            var MyLocalRotation = MyShip.MyQuaternion * MyWorldRotation * MyShip.MyConjugate;
+
+            if (MyLocalRotation.W < 0f) {
+                MyLocalRotation = Quaternion.Negate(MyLocalRotation);
+            }
+                // yaw is y
+                // pitch is x
+                // roll is z
+
             float angle;
-            MyDelta.GetAxisAngle(out axis, out angle);
+            Vector3 axis;
+            MyLocalRotation.GetAxisAngle(out axis, out angle);
             MyShip.AngularMovement = angle * axis;
         }
 
