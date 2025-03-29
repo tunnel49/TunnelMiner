@@ -35,7 +35,14 @@ namespace IngameScript
             private readonly String myRemoteControlName = "myRemoteControl";
             private readonly String myGyroName = "myGyro";
             private bool _control;
-            private Quaternion rcQuaternion, gyroQuaternion, rcConjugate, gyroConjugate;
+            public Quaternion MyQuaternion
+            {
+                get { return Quaternion.CreateFromRotationMatrix(MyGyro.WorldMatrix); } 
+            }
+            public Quaternion MyConjugate
+            {
+                get { return Quaternion.Conjugate(MyQuaternion); } 
+            }
             public bool Control
             {
                 get { return _control; }
@@ -45,14 +52,11 @@ namespace IngameScript
                     ControlEnabled(value);
                 }
             }
-            private Quaternion _angularMovement;
-            public Quaternion AngularMovement
+            public Vector3 AngularMovement //Radians per second
             {
-                get { return _angularMovement; }
                 set
                 {
-                    _angularMovement = value;
-                    UpdateGyro();
+                    UpdateGyro(value);
                 }
             }
             
@@ -61,45 +65,33 @@ namespace IngameScript
                 MyGrid = grid;
                 MyRemoteControl = grid.GridTerminalSystem.GetBlockWithName(myRemoteControlName) as IMyRemoteControl;
                 MyGyro = grid.GridTerminalSystem.GetBlockWithName(myGyroName) as IMyGyro;
-                MyRemoteControl.Orientation.GetQuaternion(out rcQuaternion);
-                rcConjugate = Quaternion.Conjugate(rcQuaternion);
-                MyGyro.Orientation.GetQuaternion(out gyroQuaternion);
-                gyroConjugate = Quaternion.Conjugate(gyroQuaternion);
             }
             private void ControlEnabled(Boolean control)
             {
                 MyGyro.GyroOverride = control;
             }
-            private void UpdateGyro()
-            {   
-                Quaternion shipAngularMovement = rcConjugate * AngularMovement * rcQuaternion;
-                Quaternion gyroAngularMovement = gyroQuaternion * shipAngularMovement * gyroConjugate;
-                var gyroToRc= rcQuaternion * gyroConjugate;
-                var rcToGyro= gyroQuaternion * rcConjugate;
-                // gyroAngularMovement = rcToGyro * AngularMovement * gyroToRc;
-                // get the pitch, roll, and yaw from the qyroAngularMovement
-                MyGrid.Echo("Angular Movement: " + AngularMovement);
-                MyGrid.Echo("Ship Angular Movement: " + shipAngularMovement);
-                MyGrid.Echo("Gyro Angular Movement: " + gyroAngularMovement);
-                MyGrid.Echo("Gyro to RC: " + gyroToRc);
-                MyGrid.Echo("RC to Gyro: " + rcToGyro);
-                MyGyro.Pitch = gyroAngularMovement.X;
-                MyGyro.Yaw = gyroAngularMovement.Y;
-                MyGyro.Roll = gyroAngularMovement.Z;
+            private void UpdateGyro(Vector3 angularMovement)
+            {
+                // Set in Radians per second, visualized in the control panel as RPM
+                MyGyro.Pitch = angularMovement.X;
+                MyGyro.Yaw = angularMovement.Y;
+                MyGyro.Roll = angularMovement.Z;
             }
-            
         }
 
         private readonly Ship MyShip;
+        private readonly Quaternion MyTargetQuaternion;
         public Program()
         {
             MyShip = new Ship(this); 
+            MyTargetQuaternion = new Quaternion(0f, 0f, 0f, 1f);
   
             // It's recommended to set Runtime.UpdateFrequency 
             // here, which will allow your script to run itself without a 
             // timer block.
 
         }
+
 
         public void Save()
         {
@@ -113,10 +105,15 @@ namespace IngameScript
 
         private void RunTick10()
         {
-            MyShip.AngularMovement = new Quaternion(0f, 0f, 1f, 0f);
+            // MyShip.AngularMovement = new Quaternion(0f, 0f, 1f, 0f);
             // This method will be called every 10th tick (6 times a second).
             // This is a good place to put code that needs to run frequently
             // but doesn't need to run every tick.
+            var MyDelta = MyTargetQuaternion * MyShip.MyConjugate ;
+            Vector3 axis;
+            float angle;
+            MyDelta.GetAxisAngle(out axis, out angle);
+            MyShip.AngularMovement = angle * axis;
         }
 
         public void Main(string argument, UpdateType updateSource)

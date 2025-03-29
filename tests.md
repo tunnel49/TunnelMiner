@@ -33,8 +33,7 @@
 4.) Skriv ut remote control blockets namn när det hittats
 5.) Skriv ut remote control blockets lokala quarternion(?)
 6.) Skriver ut den globala quaternionen för remote control blocket
-
-
+7.) Skeppet kan (med gyro alignat med skeppet) svänga till en specifik vinkel
 
 
 Skapa periodiska körningar
