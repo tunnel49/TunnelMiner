@@ -73,12 +73,9 @@ namespace IngameScript
             private void UpdateGyro(Vector3 angularMovement)
             {
                 // Set in Radians per second, visualized in the control panel as RPM
-                // yaw is y
-                // pitch is x
-                // roll is z
-                MyGyro.Pitch = angularMovement.X * -1f;
-                MyGyro.Yaw = angularMovement.Y * -1f;
-                MyGyro.Roll = angularMovement.Z * -1f;
+                MyGyro.Pitch = -angularMovement.X; 
+                MyGyro.Yaw = -angularMovement.Y; 
+                MyGyro.Roll = -angularMovement.Z;
             }
             public void RunTick10()
             {
