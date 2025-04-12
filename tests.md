@@ -15,21 +15,25 @@
 
 ## Implementationsdetaljer
 
-- Vektorn är förlängningen mellan två waypoints i en docknings AI? Anpassat till en konstant 
-  längd
+- Vektorn är förlängningen mellan två waypoints i en docknings AI?
+  Anpassat till en konstant längd
+
 - Skeppet har:
-    1. sensorer för att detektera asteroider
-    2. docknings ai
-    3. thrusters i alla kardinalriktningar
-    4. gyro
-    5. remote control
+  1. sensorer för att detektera asteroider
+  2. docknings ai
+  3. thrusters i alla kardinalriktningar
+  4. gyro
+  5. remote control
 
 ## Test
 
 1.) Programmet tar en input:
     om inputen är debug skriv ut ett meddelande i programmets output
-2.) Programmet har ett remote block, om det inte finns, skriv ut det vid debug
-3.) Det finns en sträng med remoteblockets namn, vid programstart läser programmet in objektet med det namnet. Om det finns, skriv ut att det gör det.
+2.) Programmet har ett remote block, om det inte finns, skriv ut det 
+    vid debug
+3.) Det finns en sträng med remoteblockets namn, vid programstart     
+    läser programmet in objektet med det namnet. Om det finns, skriv 
+    ut att det gör det.
 4.) Skriv ut remote control blockets namn när det hittats
 5.) Skriv ut remote control blockets lokala quarternion(?)
 6.) Skriver ut den globala quaternionen för remote control blocket

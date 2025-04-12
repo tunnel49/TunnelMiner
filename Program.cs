@@ -29,13 +29,17 @@ namespace IngameScript
     {
         public class Ship
         {
-            private readonly String myRemoteControlName = "myRemoteControl";
+            readonly Boolean CorrectW = true;
+            readonly Boolean ControlGyros = true;
+            readonly float RotationFactor = 1f;
+            private readonly String myReferenceName = "myRemoteControl";
             private readonly String myGyroName = "myGyro";
+            public Int16 pitchSign = 1;
+            public Int16 yawSign = 1;
+            public Int16 rollSign = 1;
 
-
-            public float RotationFactor { get; set; }
-            public IMyRemoteControl MyRemoteControl { get; }
-            private readonly IMyGyro MyGyro;
+            public IMyTerminalBlock MyReference { get; }
+            private readonly List<IMyGyro> MyGyros;
             private readonly MyGridProgram MyGrid;
 
             private Quaternion _targetQuaternion;
@@ -60,22 +64,33 @@ namespace IngameScript
             public Ship(MyGridProgram grid)
             {
                 MyGrid = grid;
-                RotationFactor = 1f;
-                MyRemoteControl = MyGrid.GridTerminalSystem.GetBlockWithName(myRemoteControlName) as IMyRemoteControl;
-                MyGyro = MyGrid.GridTerminalSystem.GetBlockWithName(myGyroName) as IMyGyro;
+                MyReference = MyGrid.GridTerminalSystem.GetBlockWithName(myReferenceName) as IMyRemoteControl;
+                MyGyros = new List<IMyGyro>{
+                    MyGrid.GridTerminalSystem.GetBlockWithName(myGyroName) as IMyGyro
+                };
                 MyGrid.Echo("Ship initialized");
                 TargetQuaternion = Quaternion.Zero;
             }
             private void ControlEnabled(Boolean control)
             {
-                MyGyro.GyroOverride = control;
+                foreach (var myGyro in MyGyros)
+                {
+                    myGyro.GyroOverride = control;
+                }
             }
-            private void UpdateGyro(Vector3 angularMovement)
+            private void UpdateGyro(IMyGyro myGyro, Vector3 angularMovement)
             {
+
                 // Set in Radians per second, visualized in the control panel as RPM
-                MyGyro.Pitch = -angularMovement.X; 
-                MyGyro.Yaw = -angularMovement.Y; 
-                MyGyro.Roll = -angularMovement.Z;
+                if (ControlGyros && Control ) {
+                    myGyro.Pitch = pitchSign * angularMovement.X; 
+                    myGyro.Yaw = yawSign * angularMovement.Y; 
+                    myGyro.Roll = rollSign * angularMovement.Z;
+                }
+                MyGrid.Echo("Pitch:"+ -myGyro.Pitch );
+                MyGrid.Echo("Yaw:"+ myGyro.Yaw );
+                MyGrid.Echo("Roll:"+ myGyro.Roll );
+
             }
             public void RunTick10()
             {
@@ -85,28 +100,75 @@ namespace IngameScript
             }
             private void TurnToCurrentTarget()
             {
-                var MyQuaternion = Quaternion.CreateFromRotationMatrix(MyGyro.WorldMatrix);
-                var MyConjugate = Quaternion.Conjugate(MyQuaternion); 
-                var MyWorldRotation = TargetQuaternion * MyConjugate;
-                var MyLocalRotation = MyQuaternion * MyWorldRotation * MyConjugate;
+                var worldConjugate = Quaternion.CreateFromRotationMatrix(MyReference.WorldMatrix); 
+                var rotation = TargetQuaternion * worldConjugate;
 
-                if (MyLocalRotation.W < 0f) {
-                    MyLocalRotation = Quaternion.Negate(MyLocalRotation);
+                MyGrid.Echo("Rotation X: " + rotation.X );
+                MyGrid.Echo("Rotation Y: " + rotation.Y );
+                MyGrid.Echo("Rotation Z: " + rotation.Z );
+                MyGrid.Echo("Rotation W: " + rotation.W );
+
+                Quaternion refQuaternion, refConjugate;  
+                MyReference.Orientation.GetQuaternion(out refQuaternion);
+                Quaternion.Conjugate(ref refQuaternion, out refConjugate);
+
+                var shipRotation = refQuaternion * rotation * refConjugate;
+
+                foreach (var myGyro in MyGyros)
+                {
+                    Quaternion gyroQuaternion, gyroConjugate;  
+
+                    MyReference.Orientation.GetQuaternion(out gyroQuaternion);
+                    Quaternion.Conjugate(ref gyroQuaternion, out gyroConjugate);
+                    var newGyroRotation = gyroConjugate * shipRotation * gyroQuaternion;
+                    var gyroRotation = rotation;
+
+//                      var gyroRotation = referenceRotation;
+//                    var gyroRotation = rotation;
+
+                    if (gyroRotation.W < 0f && CorrectW) {
+                        gyroRotation=Quaternion.Negate(gyroRotation);
+                    }
+
+                    float angle;
+                    Vector3 gyroAxis;
+
+                    gyroRotation.GetAxisAngle(out gyroAxis, out angle);
+                    MyGrid.Echo("Gyro Angle: " + angle );
+
+                    UpdateGyro(myGyro, angle*RotationFactor*gyroAxis);
                 }
-                float angle;
-                Vector3 axis;
-                MyLocalRotation.GetAxisAngle(out axis, out angle);
-                UpdateGyro(axis * angle * RotationFactor);
             }
         }
+
 
         private readonly Ship MyShip;
         public Program()
         {
-            MyShip = new Ship(this)
+            MyShip = new Ship(this);
+            ReadIni();
+        }
+        public void ReadIni()
+        {
+            MyIniParseResult result;
+            MyIni _ini = new MyIni();
+            if (!_ini.TryParse(Me.CustomData, out result))
             {
-                TargetQuaternion = new Quaternion(1f, 0f, 0f, 0f)
-            };
+                Echo($"Failed to parse custom data! {result}");
+                return;
+            }
+            var pitchSign = _ini.Get("Settings", "PitchSign").ToInt16(1);
+            var yawSign = _ini.Get("Settings", "YawSign").ToInt16(1);
+            var rollSign = _ini.Get("Settings", "RollSign").ToInt16(1);
+            var targetX = _ini.Get("Settings", "TargetX").ToSingle(0f);
+            var targetY = _ini.Get("Settings", "TargetY").ToSingle(0f);
+            var targetZ = _ini.Get("Settings", "TargetZ").ToSingle(0f);
+            var targetW = _ini.Get("Settings", "TargetW").ToSingle(1f);
+            var targetQuaternion = new Quaternion(targetX, targetY, targetZ, targetW);
+            MyShip.pitchSign = pitchSign;
+            MyShip.yawSign = yawSign;
+            MyShip.rollSign = rollSign;
+            MyShip.TargetQuaternion = Quaternion.Normalize(targetQuaternion);
         }
 
         public void Save()
@@ -147,20 +209,23 @@ namespace IngameScript
             switch (argument)
             {
                 case "debug":
-                    Echo("Hello World");
-                    if (MyShip.MyRemoteControl == null) {
+                    if (MyShip.MyReference == null) {
                         Echo("No remote control found");
                     } else {
                         Echo("Remote control found:");
-                        Echo("  " + MyShip.MyRemoteControl.CustomName);
+                        Echo("  " + MyShip.MyReference.CustomName);
                         Echo("My Local Quaternion:");
                         Quaternion myQuaternion;
-                        MyShip.MyRemoteControl.Orientation.GetQuaternion(out myQuaternion);
+                        MyShip.MyReference.Orientation.GetQuaternion(out myQuaternion);
                         Echo("  " + myQuaternion );
 
-                        Quaternion myWorldQuaternion = Quaternion.CreateFromRotationMatrix(MyShip.MyRemoteControl.WorldMatrix);
+                        Quaternion myWorldQuaternion = Quaternion.CreateFromRotationMatrix(MyShip.MyReference.WorldMatrix);
                         Echo("  " + myWorldQuaternion);
                     }
+                    Matrix myMatrix;
+                    MyShip.MyReference.Orientation.GetMatrix(out myMatrix);
+                    Echo("My Local Matrix:");
+                    Echo("  " + myMatrix);
                     break;
                 case "run":
                     Echo("Running");
@@ -170,8 +235,17 @@ namespace IngameScript
                     break;
                 case "stop":
                     Echo("Stopping");
+//                    Runtime.UpdateFrequency = UpdateFrequency.None;
+                    MyShip.Control = false;
+                    break;
+                case "halt":
+                    Echo("Stopping");
                     Runtime.UpdateFrequency = UpdateFrequency.None;
                     MyShip.Control = false;
+                    break;
+                case "read":
+                    Echo("Reading ini file");
+                    ReadIni();
                     break;
             }
         }
