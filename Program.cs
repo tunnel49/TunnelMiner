@@ -29,17 +29,31 @@ namespace IngameScript
     {
         public class Ship
         {
-            readonly Boolean CorrectW = true;
+            private readonly List<IMyGyro> MyGyros = new List<IMyGyro>();
             readonly Boolean ControlGyros = true;
-            readonly float RotationFactor = 1f;
-            private readonly String myReferenceName = "myRemoteControl";
-            private readonly String myGyroName = "myGyro";
-            public Int16 pitchSign = 1;
-            public Int16 yawSign = 1;
-            public Int16 rollSign = 1;
+            private String _terminalTag;
+            public String TerminalTag { 
+                get { return _terminalTag; } 
+                set { 
+                    ControlEnabled(false);
+                    _terminalTag = value; 
+                    List<IMyRemoteControl> myRemoteControls = new List<IMyRemoteControl>();
+                    MyGrid.GridTerminalSystem.GetBlocksOfType<IMyRemoteControl>(myRemoteControls, x => x.CustomName.Contains(_terminalTag));
+                    MyGrid.GridTerminalSystem.GetBlocksOfType<IMyGyro>(MyGyros, x => x.CustomName.Contains(_terminalTag));
+                    switch (myRemoteControls.Count) {
+                        case 1:
+                            myReference = myRemoteControls[0];
+                            break;
+                        default:
+                            _control = false;
+                            throw new Exception("Needs exactly one remote control! Found: " + myRemoteControls.Count);
+                    }
+                    ControlEnabled(_control);
+                }
+            }
 
-            public IMyTerminalBlock MyReference { get; }
-            private readonly List<IMyGyro> MyGyros;
+            readonly float RotationFactor = 1f;
+            private IMyTerminalBlock myReference;
             private readonly MyGridProgram MyGrid;
 
             private Quaternion _targetQuaternion;
@@ -61,15 +75,12 @@ namespace IngameScript
                     ControlEnabled(value);
                 }
             }
-            public Ship(MyGridProgram grid)
+            public Ship(MyGridProgram grid, String terminalTag)
             {
                 MyGrid = grid;
-                MyReference = MyGrid.GridTerminalSystem.GetBlockWithName(myReferenceName) as IMyRemoteControl;
-                MyGyros = new List<IMyGyro>{
-                    MyGrid.GridTerminalSystem.GetBlockWithName(myGyroName) as IMyGyro
-                };
                 MyGrid.Echo("Ship initialized");
                 TargetQuaternion = Quaternion.Zero;
+                TerminalTag = terminalTag;
             }
             private void ControlEnabled(Boolean control)
             {
@@ -83,14 +94,10 @@ namespace IngameScript
 
                 // Set in Radians per second, visualized in the control panel as RPM
                 if (ControlGyros && Control ) {
-                    myGyro.Pitch = pitchSign * angularMovement.X; 
-                    myGyro.Yaw = yawSign * angularMovement.Y; 
-                    myGyro.Roll = rollSign * angularMovement.Z;
+                    myGyro.Pitch = angularMovement.X; 
+                    myGyro.Yaw = angularMovement.Y; 
+                    myGyro.Roll = angularMovement.Z;
                 }
-                MyGrid.Echo("Pitch:"+ -myGyro.Pitch );
-                MyGrid.Echo("Yaw:"+ myGyro.Yaw );
-                MyGrid.Echo("Roll:"+ myGyro.Roll );
-
             }
             public void RunTick10()
             {
@@ -100,16 +107,15 @@ namespace IngameScript
             }
             private void TurnToCurrentTarget()
             {
-                var worldConjugate = Quaternion.CreateFromRotationMatrix(MyReference.WorldMatrix); 
+                var worldConjugate = Quaternion.CreateFromRotationMatrix(myReference.WorldMatrix); 
                 var rotation = TargetQuaternion * worldConjugate;
 
-                MyGrid.Echo("Rotation X: " + rotation.X );
-                MyGrid.Echo("Rotation Y: " + rotation.Y );
-                MyGrid.Echo("Rotation Z: " + rotation.Z );
-                MyGrid.Echo("Rotation W: " + rotation.W );
+                if (rotation.W < 0f) {
+                    rotation=Quaternion.Negate(rotation);
+                }
 
                 Quaternion refQuaternion, refConjugate;  
-                MyReference.Orientation.GetQuaternion(out refQuaternion);
+                myReference.Orientation.GetQuaternion(out refQuaternion);
                 Quaternion.Conjugate(ref refQuaternion, out refConjugate);
 
                 var shipRotation = refQuaternion * rotation * refConjugate;
@@ -118,24 +124,14 @@ namespace IngameScript
                 {
                     Quaternion gyroQuaternion, gyroConjugate;  
 
-                    MyReference.Orientation.GetQuaternion(out gyroQuaternion);
+                    myGyro.Orientation.GetQuaternion(out gyroQuaternion);
                     Quaternion.Conjugate(ref gyroQuaternion, out gyroConjugate);
-                    var newGyroRotation = gyroConjugate * shipRotation * gyroQuaternion;
-                    var gyroRotation = rotation;
-
-//                      var gyroRotation = referenceRotation;
-//                    var gyroRotation = rotation;
-
-                    if (gyroRotation.W < 0f && CorrectW) {
-                        gyroRotation=Quaternion.Negate(gyroRotation);
-                    }
+                    var gyroRotation = gyroConjugate * shipRotation * gyroQuaternion;
 
                     float angle;
                     Vector3 gyroAxis;
 
                     gyroRotation.GetAxisAngle(out gyroAxis, out angle);
-                    MyGrid.Echo("Gyro Angle: " + angle );
-
                     UpdateGyro(myGyro, angle*RotationFactor*gyroAxis);
                 }
             }
@@ -145,11 +141,6 @@ namespace IngameScript
         private readonly Ship MyShip;
         public Program()
         {
-            MyShip = new Ship(this);
-            ReadIni();
-        }
-        public void ReadIni()
-        {
             MyIniParseResult result;
             MyIni _ini = new MyIni();
             if (!_ini.TryParse(Me.CustomData, out result))
@@ -157,20 +148,19 @@ namespace IngameScript
                 Echo($"Failed to parse custom data! {result}");
                 return;
             }
-            var pitchSign = _ini.Get("Settings", "PitchSign").ToInt16(1);
-            var yawSign = _ini.Get("Settings", "YawSign").ToInt16(1);
-            var rollSign = _ini.Get("Settings", "RollSign").ToInt16(1);
+            var terminalTag = _ini.Get("Settings", "TerminalTag").ToString("[tnm]");
             var targetX = _ini.Get("Settings", "TargetX").ToSingle(0f);
             var targetY = _ini.Get("Settings", "TargetY").ToSingle(0f);
             var targetZ = _ini.Get("Settings", "TargetZ").ToSingle(0f);
             var targetW = _ini.Get("Settings", "TargetW").ToSingle(1f);
             var targetQuaternion = new Quaternion(targetX, targetY, targetZ, targetW);
-            MyShip.pitchSign = pitchSign;
-            MyShip.yawSign = yawSign;
-            MyShip.rollSign = rollSign;
-            MyShip.TargetQuaternion = Quaternion.Normalize(targetQuaternion);
-        }
 
+            MyShip = new Ship(this, terminalTag)
+            {
+                TargetQuaternion = Quaternion.Normalize(targetQuaternion)
+            };
+
+        }
         public void Save()
         {
             // Called when the program needs to save its state. Use
@@ -209,43 +199,16 @@ namespace IngameScript
             switch (argument)
             {
                 case "debug":
-                    if (MyShip.MyReference == null) {
-                        Echo("No remote control found");
-                    } else {
-                        Echo("Remote control found:");
-                        Echo("  " + MyShip.MyReference.CustomName);
-                        Echo("My Local Quaternion:");
-                        Quaternion myQuaternion;
-                        MyShip.MyReference.Orientation.GetQuaternion(out myQuaternion);
-                        Echo("  " + myQuaternion );
-
-                        Quaternion myWorldQuaternion = Quaternion.CreateFromRotationMatrix(MyShip.MyReference.WorldMatrix);
-                        Echo("  " + myWorldQuaternion);
-                    }
-                    Matrix myMatrix;
-                    MyShip.MyReference.Orientation.GetMatrix(out myMatrix);
-                    Echo("My Local Matrix:");
-                    Echo("  " + myMatrix);
                     break;
                 case "run":
                     Echo("Running");
                     Runtime.UpdateFrequency = UpdateFrequency.Update10;
                     MyShip.Control = true;
-
                     break;
                 case "stop":
                     Echo("Stopping");
-//                    Runtime.UpdateFrequency = UpdateFrequency.None;
-                    MyShip.Control = false;
-                    break;
-                case "halt":
-                    Echo("Stopping");
                     Runtime.UpdateFrequency = UpdateFrequency.None;
                     MyShip.Control = false;
-                    break;
-                case "read":
-                    Echo("Reading ini file");
-                    ReadIni();
                     break;
             }
         }
