@@ -56,14 +56,12 @@ namespace IngameScript
             private IMyTerminalBlock myReference;
             private readonly MyGridProgram MyGrid;
 
-            private Quaternion _targetQuaternion;
-            public Quaternion TargetQuaternion
-            {
-                get { return _targetQuaternion; }
-                set
-                {
-                    _targetQuaternion = value;
-                }
+            private Quaternion homeQuaternion;
+            private Vector3D homePosition;
+            public void SetHome(){
+                var homeConjugate = Quaternion.CreateFromRotationMatrix(myReference.WorldMatrix); 
+                homeQuaternion = Quaternion.Conjugate(homeConjugate);
+                homePosition = myReference.GetPosition();
             }
             private bool _control;
             public bool Control
@@ -79,7 +77,7 @@ namespace IngameScript
             {
                 MyGrid = grid;
                 MyGrid.Echo("Ship initialized");
-                TargetQuaternion = Quaternion.Zero;
+                homeQuaternion = Quaternion.Zero;
                 TerminalTag = terminalTag;
             }
             private void ControlEnabled(Boolean control)
@@ -101,14 +99,14 @@ namespace IngameScript
             }
             public void RunTick10()
             {
-                if (! Quaternion.IsZero(TargetQuaternion)) {
+                if (! Quaternion.IsZero(homeQuaternion)) {
                     TurnToCurrentTarget();
                 }
             }
             private void TurnToCurrentTarget()
             {
                 var worldConjugate = Quaternion.CreateFromRotationMatrix(myReference.WorldMatrix); 
-                var rotation = TargetQuaternion * worldConjugate;
+                var rotation = homeQuaternion * worldConjugate;
 
                 if (rotation.W < 0f) {
                     rotation=Quaternion.Negate(rotation);
@@ -155,11 +153,7 @@ namespace IngameScript
             var targetW = _ini.Get("Settings", "TargetW").ToSingle(1f);
             var targetQuaternion = new Quaternion(targetX, targetY, targetZ, targetW);
 
-            MyShip = new Ship(this, terminalTag)
-            {
-                TargetQuaternion = Quaternion.Normalize(targetQuaternion)
-            };
-
+            MyShip = new Ship(this, terminalTag);
         }
         public void Save()
         {
@@ -209,6 +203,10 @@ namespace IngameScript
                     Echo("Stopping");
                     Runtime.UpdateFrequency = UpdateFrequency.None;
                     MyShip.Control = false;
+                    break;
+                case "home":
+                    Echo("Setting home position");
+                    MyShip.SetHome();
                     break;
             }
         }
