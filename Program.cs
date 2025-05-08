@@ -30,7 +30,7 @@ namespace IngameScript
     {
 
 
-        private readonly T49Ship MyShip;
+        private readonly T49TunnelMiner MyShip;
         public Program()
         {
             MyIniParseResult result;
@@ -47,7 +47,7 @@ namespace IngameScript
             var targetW = _ini.Get("Settings", "TargetW").ToSingle(1f);
             var targetQuaternion = new Quaternion(targetX, targetY, targetZ, targetW);
 
-            MyShip = new T49Ship(this, terminalTag);
+            MyShip = new T49TunnelMiner(this, terminalTag);
         }
         public void Save()
         {
